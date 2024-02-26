@@ -65,6 +65,8 @@ save_histogram(flat_field_array, f'{folder}/flat_field_histogram.png')
 array2img(flat_field_array).save(folder/'flat_field.png')
 
 
+# Чтение фотографий
+
 def band_reader(name: str):
     band_list = []
     for file in fits_list(folder/name):
@@ -87,3 +89,7 @@ photospectral_cube = photospectral_cube[:,20:,19:] # обрезка чёрных
 for i in range(len(bands)):
     img = array2img(photospectral_cube[i])
     img.save(f'{folder}/band_{i}_{bands[i]}.png')
+
+
+# Выравнивание
+
