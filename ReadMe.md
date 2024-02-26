@@ -7,3 +7,5 @@
 2. Создать папку виртуального окружения `python -m venv .venv`;
 3. Установить все библиотеки `.venv/bin/pip install -r requirements.txt`;
 4. Запускать программы через `.venv/bin/python3`, или через `python3`, предварительно активировав среду: `source .venv/bin/activate`.
+
+Чтобы конфигурационные файлы не отслеживались, может понадобится выполнить `git update-index --assume-unchanged **/config.py`.
