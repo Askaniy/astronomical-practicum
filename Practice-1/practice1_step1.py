@@ -30,7 +30,7 @@ def array2img(array: np.ndarray):
 
 def crop(array):
     """ Инверсия вертикальной оси и обрезка чёрных краёв """
-    return (array[::-1,:])[20:,19:]
+    return array[-22:0:-1,19:]
 
 # Чтение смещений
 
@@ -59,12 +59,11 @@ for file in fits_list(folder):
     with fits.open(file) as hdul:
         header = hdul[0].header
         if header['IMAGETYP'] != 'bias':
-            data = (crop(hdul[0].data) - bias_array) / header['EXPTIME']
-            flat_field_list.append(data)
+            data = crop(hdul[0].data) - bias_array
+            flat_field_list.append(data / np.median(data))
             #save_histogram(data, f'{folder}/{file.stem}.png')
 
 flat_field_array = np.median(np.array(flat_field_list), axis=0)
-flat_field_array /= flat_field_array.mean()
 flat_field_array = np.clip(flat_field_array, 0.01, None)
 #save_histogram(flat_field_array, f'{folder}/flat_field_histogram.png')
 array2img(flat_field_array).save(folder/'flat_field.png')
@@ -88,9 +87,9 @@ def band_reader(name: str):
     return np.mean(np.array(band_list), axis=0)
 
 bands = ('B', 'V', 'R', 'I')
-band_list = []
-for band in bands:
-    band_list.append(band_reader(band))
+band_list = [band_reader(bands[0])]
+for band in bands[1:]:
+    band_list.append(shifted(band_list[0], band_reader(band)))
 
 photospectral_cube = np.array(band_list)
 
