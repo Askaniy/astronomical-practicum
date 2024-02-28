@@ -3,3 +3,5 @@ astropy
 matplotlib
 Pillow
 sigfig
+image_registration
+pytest
