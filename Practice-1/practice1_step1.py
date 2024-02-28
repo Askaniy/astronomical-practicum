@@ -86,12 +86,21 @@ def band_reader(name: str):
     band_list[1] = shifted(band_list[0], band_list[1])
     return np.mean(np.array(band_list), axis=0)
 
-bands = ('B', 'V', 'R', 'I')
-band_list = [band_reader(bands[0])]
-for band in bands[1:]:
-    band_list.append(shifted(band_list[0], band_reader(band)))
+from photutils.background import Background2D
 
-photospectral_cube = np.array(band_list)
+def background_subtracted(array: np.ndarray):
+    bkg = Background2D(array, (50, 50))
+    return array - bkg.background
+
+bands = ('B', 'V', 'R', 'I')
+band_list = [background_subtracted(band_reader(bands[0]))]
+for band in bands[1:]:
+    band_list.append(shifted(band_list[0], background_subtracted(band_reader(band))))
+
+gamma_correction = np.vectorize(lambda br: br * 12.92 if br < 0.0031308 else 1.055 * br**(1.0/2.4) - 0.055)
+
+photospectral_cube = np.clip(np.array(band_list), 0, None)
+photospectral_cube = gamma_correction(photospectral_cube / photospectral_cube.max())
 
 for i in range(len(bands)):
     array2img(photospectral_cube[i]).save(f'{folder}/band_{i}_{bands[i]}.png')
