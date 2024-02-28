@@ -71,31 +71,33 @@ array2img(flat_field_array).save(folder/'flat_field.png')
 
 # Чтение фотографий
 
+from photutils.background import Background2D
+
+def background_subtracted(array: np.ndarray):
+    bkg = Background2D(array, (256, 256))
+    return array - bkg.background
+
 def shifted(reference, target):
     xoff, yoff = chi2_shift(reference, target, return_error=False, upsample_factor='auto')
     return shift.shift2d(target, -xoff, -yoff)
 
 def band_reader(name: str):
     band_list = []
+    exposure_counter = 0.
     for file in fits_list(folder/name):
         with fits.open(file) as hdul:
             header = hdul[0].header
-            data = (crop(hdul[0].data) - bias_array) / header['EXPTIME'] / flat_field_array
+            exposure_counter += header['EXPTIME']
+            data = background_subtracted((crop(hdul[0].data) - bias_array) / flat_field_array)
             band_list.append(data)
             #save_histogram(data, f'{folder}/{name}/{file.stem}.png')
     band_list[1] = shifted(band_list[0], band_list[1])
-    return np.mean(np.array(band_list), axis=0)
-
-from photutils.background import Background2D
-
-def background_subtracted(array: np.ndarray):
-    bkg = Background2D(array, (50, 50))
-    return array - bkg.background
+    return np.sum(np.array(band_list), axis=0) / exposure_counter
 
 bands = ('B', 'V', 'R', 'I')
-band_list = [background_subtracted(band_reader(bands[0]))]
+band_list = [band_reader(bands[0])]
 for band in bands[1:]:
-    band_list.append(shifted(band_list[0], background_subtracted(band_reader(band))))
+    band_list.append(shifted(band_list[0], band_reader(band)))
 
 gamma_correction = np.vectorize(lambda br: br * 12.92 if br < 0.0031308 else 1.055 * br**(1.0/2.4) - 0.055)
 
