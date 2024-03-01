@@ -3,6 +3,7 @@ from itertools import chain
 from astropy.io import fits
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
+from skimage import restoration
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
@@ -101,41 +102,28 @@ for band in bands[1:]:
     band_list.append(shifted(band_list[0], band_reader(band)))
 
 #gamma_correction = np.vectorize(lambda br: br * 12.92 if br < 0.0031308 else 1.055 * br**(1.0/2.4) - 0.055)
-gamma_correction = np.vectorize(lambda br: br**(1.0/5))
+#gamma_correction = np.vectorize(lambda br: br**(1.0/5))
 
-photospectral_cube = np.clip(np.array(band_list), 0, None)
+photospectral_cube = np.array(band_list)
 #photospectral_cube = gamma_correction(photospectral_cube / photospectral_cube.max())
+
+def gaussian_array(width):
+    side = np.linspace(-1, 1, width)
+    x, y = np.meshgrid(side, side)
+    return np.exp(-4*(x*x + y*y))
+
+def one_dix_x_array(width):
+    side = np.linspace(-1, 1, width)
+    x, y = np.meshgrid(side, side)
+    return np.exp(-4*np.sqrt(x*x + y*y))
+
+# Сохранение нормированных на максимальную яркость картинок
 
 for i in range(len(bands)):
     #save_histogram(photospectral_cube[i], f'{folder}/hist_{i}_{bands[i]}.png')
-    array2img(gamma_correction(photospectral_cube[i])).save(f'{folder}/band_{i}_{bands[i]}.png')
+    array = photospectral_cube[i]
+    array = restoration.unsupervised_wiener(array, one_dix_x_array(11), clip=False)[0] # Деконволюция
+    array = np.clip(array, 0, None) # Убирает отрицательные значения
+    array = array**0.25 # Усиленная гамма-коррекция
+    array2img(array).save(f'{folder}/band_{i}_{bands[i]}.png')
 
-
-# Деконволюция
-
-def gaussian_array(width):
-    x = np.linspace(-1, 1, width)
-    y = np.linspace(-1, 1, width)
-    X, Y = np.meshgrid(x, y)
-    Z = np.exp(-2*(X*X + Y*Y)) + 1
-    array2img(Z).save(folder/'psf.png')
-    return Z / np.sum(Z)
-
-from skimage import restoration
-
-psf = np.asarray(Image.open(folder/'psf_1_V.png'))
-
-def deconvolve(array: np.ndarray, psf: np.ndarray):
-    psf = gaussian_array(5)
-    return restoration.unsupervised_wiener(array, psf, clip=False)[0]
-
-psf_size = 23
-psf_x = 244
-pas_y = 690
-
-psf_cube = photospectral_cube[:, pas_y:pas_y+psf_size, psf_x:psf_x+psf_size]
-
-for i in range(len(bands)):
-    psf = psf_cube[i]
-    array2img(psf).save(f'{folder}/psf_{i}_{bands[i]}.png')
-    array2img(deconvolve(gamma_correction(photospectral_cube[i]), psf)).save(f'{folder}/band_{i}_{bands[i]}_.png')
