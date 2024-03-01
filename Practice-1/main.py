@@ -1,37 +1,14 @@
 from pathlib import Path
-from itertools import chain
 from astropy.io import fits
-from image_registration import chi2_shift
-from image_registration.fft_tools import shift
-from skimage import restoration
-from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 
+# Путь к данным до папки stud
 from config import data_folder
 folder = Path(data_folder).expanduser()
 
+# Функции из отдельного файла
+from functions import *
 
-def fits_list(path: Path):
-    return chain.from_iterable(path.glob(f'*.{ext}') for ext in ('fts', 'fit', 'fits'))
-
-def save_histogram(array: np.ndarray, path: str):
-    fig, ax = plt.subplots(1, 1, figsize=(9, 6), dpi=100)
-    ax.hist(array.flatten())
-    fig.savefig(path)
-    plt.close(fig)
-
-def print_min_mean_max(array: np.ndarray):
-    print(f'Min: {array.min():.2f};\tMean: {array.mean():.2f};\tMax: {array.max():.2f}.')
-
-def array2img(array: np.ndarray):
-    array_norm = array / array.max() * 255
-    img = Image.fromarray(array_norm.clip(0, 255).astype('uint8'), mode='L')
-    return img
-
-def crop(array):
-    """ Инверсия вертикальной оси и обрезка чёрных краёв """
-    return array[-22:0:-1,19:]
 
 # Чтение смещений
 
@@ -70,17 +47,7 @@ flat_field_array = np.clip(flat_field_array, 0.01, None)
 array2img(flat_field_array).save(folder/'flat_field.png')
 
 
-# Чтение фотографий
-
-from photutils.background import Background2D
-
-def background_subtracted(array: np.ndarray):
-    bkg = Background2D(array, (200, 200))
-    return array - bkg.background
-
-def shifted(reference, target):
-    xoff, yoff = chi2_shift(reference, target, return_error=False, upsample_factor='auto')
-    return shift.shift2d(target, -xoff, -yoff)
+# Чтение фотографий и запись в куб
 
 def band_reader(name: str):
     band_list = []
@@ -101,29 +68,15 @@ band_list = [band_reader(bands[0])]
 for band in bands[1:]:
     band_list.append(shifted(band_list[0], band_reader(band)))
 
-#gamma_correction = np.vectorize(lambda br: br * 12.92 if br < 0.0031308 else 1.055 * br**(1.0/2.4) - 0.055)
-#gamma_correction = np.vectorize(lambda br: br**(1.0/5))
-
 photospectral_cube = np.array(band_list)
-#photospectral_cube = gamma_correction(photospectral_cube / photospectral_cube.max())
 
-def gaussian_array(width):
-    side = np.linspace(-1, 1, width)
-    x, y = np.meshgrid(side, side)
-    return np.exp(-4*(x*x + y*y))
 
-def one_dix_x_array(width):
-    side = np.linspace(-1, 1, width)
-    x, y = np.meshgrid(side, side)
-    return np.exp(-4*np.sqrt(x*x + y*y))
-
-# Сохранение нормированных на максимальную яркость картинок
+# Сохранение нормированных на максимальную яркость фотографий
 
 for i in range(len(bands)):
     #save_histogram(photospectral_cube[i], f'{folder}/hist_{i}_{bands[i]}.png')
     array = photospectral_cube[i]
-    array = restoration.unsupervised_wiener(array, one_dix_x_array(11), clip=False)[0] # Деконволюция
+    array = deconvolved(array, one_dix_x_array(11)) # Убирает размытие
     array = np.clip(array, 0, None) # Убирает отрицательные значения
     array = array**0.25 # Усиленная гамма-коррекция
     array2img(array).save(f'{folder}/band_{i}_{bands[i]}.png')
-
