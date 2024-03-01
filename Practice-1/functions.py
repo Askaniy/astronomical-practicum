@@ -38,10 +38,19 @@ def background_subtracted(array: np.ndarray):
     bkg = Background2D(array, (200, 200))
     return array - bkg.background
 
+def float_shift(array: np.ndarray, x_shift: float, y_shift: float):
+    """ Cубпиксельный циклический сдвиг """
+    y_len, x_len = array.shape
+    x_freq = x_shift * np.fft.fftfreq(x_len)[np.newaxis,:]
+    y_freq = y_shift * np.fft.fftfreq(y_len)[:,np.newaxis]
+    freq_grid = x_freq + y_freq
+    kernel = np.exp(-1j*2*np.pi*freq_grid)
+    return np.real(np.fft.ifftn(np.fft.fftn(array) * kernel))
+
 def shifted(reference: np.ndarray, target: np.ndarray):
     """ Определяет сдвиг и выравнивает два изображения """
     xoff, yoff = chi2_shift(reference, target, return_error=False, upsample_factor='auto')
-    return shift.shift2d(target, -xoff, -yoff)
+    return float_shift(target, -xoff, -yoff)
 
 def gaussian_array(width: int):
     """ Формирует ядро свёртки """
