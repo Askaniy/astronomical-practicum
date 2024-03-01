@@ -16,7 +16,7 @@ def fits_list(path: Path):
 
 def save_histogram(array: np.ndarray, path: str):
     fig, ax = plt.subplots(1, 1, figsize=(9, 6), dpi=100)
-    ax.hist(array.flatten(), bins='auto')
+    ax.hist(array.flatten())
     fig.savefig(path)
     plt.close(fig)
 
@@ -74,7 +74,7 @@ array2img(flat_field_array).save(folder/'flat_field.png')
 from photutils.background import Background2D
 
 def background_subtracted(array: np.ndarray):
-    bkg = Background2D(array, (256, 256))
+    bkg = Background2D(array, (200, 200))
     return array - bkg.background
 
 def shifted(reference, target):
@@ -92,17 +92,50 @@ def band_reader(name: str):
             band_list.append(data)
             #save_histogram(data, f'{folder}/{name}/{file.stem}.png')
     band_list[1] = shifted(band_list[0], band_list[1])
-    return np.sum(np.array(band_list), axis=0) / exposure_counter
+    res = np.sum(np.array(band_list), axis=0) / exposure_counter
+    return res
 
 bands = ('B', 'V', 'R', 'I')
 band_list = [band_reader(bands[0])]
 for band in bands[1:]:
     band_list.append(shifted(band_list[0], band_reader(band)))
 
-gamma_correction = np.vectorize(lambda br: br * 12.92 if br < 0.0031308 else 1.055 * br**(1.0/2.4) - 0.055)
+#gamma_correction = np.vectorize(lambda br: br * 12.92 if br < 0.0031308 else 1.055 * br**(1.0/2.4) - 0.055)
+gamma_correction = np.vectorize(lambda br: br**(1.0/5))
 
 photospectral_cube = np.clip(np.array(band_list), 0, None)
-photospectral_cube = gamma_correction(photospectral_cube / photospectral_cube.max())
+#photospectral_cube = gamma_correction(photospectral_cube / photospectral_cube.max())
 
 for i in range(len(bands)):
-    array2img(photospectral_cube[i]).save(f'{folder}/band_{i}_{bands[i]}.png')
+    #save_histogram(photospectral_cube[i], f'{folder}/hist_{i}_{bands[i]}.png')
+    array2img(gamma_correction(photospectral_cube[i])).save(f'{folder}/band_{i}_{bands[i]}.png')
+
+
+# Деконволюция
+
+def gaussian_array(width):
+    x = np.linspace(-1, 1, width)
+    y = np.linspace(-1, 1, width)
+    X, Y = np.meshgrid(x, y)
+    Z = np.exp(-2*(X*X + Y*Y)) + 1
+    array2img(Z).save(folder/'psf.png')
+    return Z / np.sum(Z)
+
+from skimage import restoration
+
+psf = np.asarray(Image.open(folder/'psf_1_V.png'))
+
+def deconvolve(array: np.ndarray, psf: np.ndarray):
+    psf = gaussian_array(5)
+    return restoration.unsupervised_wiener(array, psf, clip=False)[0]
+
+psf_size = 23
+psf_x = 244
+pas_y = 690
+
+psf_cube = photospectral_cube[:, pas_y:pas_y+psf_size, psf_x:psf_x+psf_size]
+
+for i in range(len(bands)):
+    psf = psf_cube[i]
+    array2img(psf).save(f'{folder}/psf_{i}_{bands[i]}.png')
+    array2img(deconvolve(gamma_correction(photospectral_cube[i]), psf)).save(f'{folder}/band_{i}_{bands[i]}_.png')
