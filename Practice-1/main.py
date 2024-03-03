@@ -75,8 +75,7 @@ for i in range(len(bands)):
     array = array**0.25 # Усиленная гамма-коррекция
     array2img(array).save(f'{folder}/-band_{i}_{bands[i]}.png')
 
-photospectral_cube = np.array(band_list)
-photospectral_cube = aligned_cube(photospectral_cube, crop=True)
+photospectral_cube = aligned_cube(band_list, crop=True)
 
 
 # Сохранение нормированных на максимальную яркость фотографий

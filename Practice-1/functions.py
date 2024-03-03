@@ -51,50 +51,49 @@ def float_shift(array: np.ndarray, x_shift: float, y_shift: float):
     kernel = np.exp(-1j*2*np.pi*freq_grid)
     return np.real(np.fft.ifftn(np.fft.fftn(array) * kernel))
 
-def aligned_cube(cube0: np.ndarray, crop: bool = False):
+def aligned_cube(cube0: list|np.ndarray, crop: bool = False):
     """ Выравнивание каналов спектрального куба """
-    bands_num, y_len0, x_len0 = cube0.shape
+    if isinstance(cube0, list): # создание куба, если его нет
+        arrays = cube0
+        shapes = []
+        for band in arrays:
+            shapes.append(band.shape)
+        y_len0, x_len0 = np.max(shapes, axis=0)
+        bands_num = len(arrays)
+        cube0 = np.empty((bands_num, y_len0, x_len0))
+        cube0.fill(np.nan)
+        for i, band in enumerate(arrays):
+            cube0[i, :shapes[i][0], :shapes[i][1]] = band
+    else:
+        bands_num, y_len0, x_len0 = cube0.shape
+    cube0 = np.nan_to_num(cube0)
     green_id = ceil(bands_num / 2) - 1 # единственное неискажённое изображение будет в середине
     shifts = [(0, 0)]
     for i in range(bands_num-1):
         shifts.append(chi2_shift(cube0[i], cube0[i+1], return_error=False, upsample_factor='auto'))
     shifts = -np.array(shifts)
-    print(f'{shifts=}')
     walked = np.cumsum(shifts, axis=0)
-    print(f'{walked=}')
     walked -= walked[green_id] # нормирование относительно "зелёного" изображения
-    print(f'{walked=}')
     walked_min = np.min(walked, axis=0)
-    print(f'{walked_min=}')
     walked_max = np.max(walked, axis=0)
-    print(f'{walked_max=}')
     walked_len = walked_max - walked_min
-    print(f'{walked_len=}')
     if crop:
-        x_len1, y_len1 = (x_len0, y_len0) - walked_len
-        x_zero, y_zero = walked_max
-        x_end = ceil(x_zero + x_len1)
-        y_end = ceil(y_zero + y_len1)
-        x_zero = floor(x_zero)
-        y_zero = floor(y_zero)
+        x_len1, y_len1 = np.ceil((x_len0, y_len0) - walked_len).astype('int')
+        x_zero, y_zero = np.floor(walked_max).astype('int')
+        x_end = x_zero + x_len1
+        y_end = y_zero + y_len1
     else:
-        x_len1, y_len1 = (x_len0, y_len0) + walked_len
-        x_zero, y_zero = -walked_min
-        x_end = ceil(x_zero + x_len0)
-        y_end = ceil(y_zero + y_len0)
-        x_zero = ceil(x_zero)
-        y_zero = ceil(y_zero)
-    x_len1 = ceil(x_len1)
-    y_len1 = ceil(y_len1)
+        x_len1, y_len1 = np.ceil((x_len0, y_len0) + walked_len).astype('int')
+        x_zero, y_zero = np.floor(-walked_min).astype('int')
+        x_end = x_zero + x_len0
+        y_end = y_zero + y_len0
     cube1 = np.empty((bands_num, y_len1, x_len1))
     if crop:
         for i in range(bands_num):
             if i == green_id:
                 cube1[i] = cube0[i, y_zero:y_end, x_zero:x_end]
             else:
-                print(f'Band {i}')
                 x_shift, y_shift = walked[i]
-                print(f'{x_shift=} {y_shift=}')
                 array = float_shift(cube0[i], x_shift, y_shift)
                 cube1[i] = array[y_zero:y_end, x_zero:x_end]
     else:
@@ -137,7 +136,7 @@ def aligned_cube(cube0: np.ndarray, crop: bool = False):
                 if y_floor != 0:
                     if y_shift > 0:
                         edge = deepcopy(array[:y_floor, :]) # copy
-                        array[:x_ceil, :] = np.nan # cut
+                        array[:y_ceil, :] = np.nan # cut
                         cube1[i, y_end:y_end+y_floor, x_zero:x_end] = edge # paste
                     else:
                         edge = deepcopy(array[-y_floor:, :]) # copy
