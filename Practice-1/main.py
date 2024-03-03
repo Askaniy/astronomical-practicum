@@ -60,15 +60,25 @@ def band_reader(name: str):
             band_list.append(data)
             #save_histogram(data, f'{folder}/{name}/{file.stem}.png')
     band_list[1] = shifted(band_list[0], band_list[1])
-    res = np.sum(np.array(band_list), axis=0) / exposure_counter
-    return res
+    cube = np.array(band_list)
+    #cube = aligned_cube(np.array(band_list), crop=False)
+    return np.sum(cube, axis=0) / exposure_counter
 
 bands = ('B', 'V', 'R', 'I')
-band_list = [band_reader(bands[0])]
-for band in bands[1:]:
-    band_list.append(shifted(band_list[0], band_reader(band)))
+band_list = []
+for band in bands:
+    band_list.append(band_reader(band))
+
+for i in range(len(bands)):
+    #save_histogram(photospectral_cube[i], f'{folder}/hist_{i}_{bands[i]}.png')
+    array = band_list[i]
+    #array = deconvolved(array, one_div_x_array(11)) # Убирает размытие
+    array = np.clip(array, 0, None) # Убирает отрицательные значения
+    array = array**0.25 # Усиленная гамма-коррекция
+    array2img(array).save(f'{folder}/-band_{i}_{bands[i]}.png')
 
 photospectral_cube = np.array(band_list)
+photospectral_cube = aligned_cube(photospectral_cube, crop=True)
 
 
 # Сохранение нормированных на максимальную яркость фотографий
@@ -76,7 +86,7 @@ photospectral_cube = np.array(band_list)
 for i in range(len(bands)):
     #save_histogram(photospectral_cube[i], f'{folder}/hist_{i}_{bands[i]}.png')
     array = photospectral_cube[i]
-    array = deconvolved(array, one_dix_x_array(11)) # Убирает размытие
+    #array = deconvolved(array, one_div_x_array(11)) # Убирает размытие
     array = np.clip(array, 0, None) # Убирает отрицательные значения
     array = array**0.25 # Усиленная гамма-коррекция
     array2img(array).save(f'{folder}/band_{i}_{bands[i]}.png')
