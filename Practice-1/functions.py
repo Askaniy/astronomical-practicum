@@ -71,31 +71,32 @@ def aligned_cube(cube0: np.ndarray, crop: bool = False):
     walked_len = walked_max - walked_min
     print(f'{walked_len=}')
     if crop:
-        x_len1, y_len1 = np.floor((x_len0, y_len0) - walked_len).astype('int')
-        x_zero, y_zero = np.ceil(walked_max).astype('int')
-        x_end = x_zero + x_len1
-        y_end = y_zero + y_len1
+        x_len1, y_len1 = (x_len0, y_len0) - walked_len
+        x_zero, y_zero = walked_max
+        x_end = ceil(x_zero + x_len1)
+        y_end = ceil(y_zero + y_len1)
+        x_zero = floor(x_zero)
+        y_zero = floor(y_zero)
     else:
-        x_len1, y_len1 = np.floor((x_len0, y_len0) + walked_len).astype('int')
-        x_zero, y_zero = np.ceil(-walked_min).astype('int')
-        x_end = x_zero + x_len0
-        y_end = y_zero + y_len0
-    print(f'{x_len0=} {y_len0=}')
-    print(f'{x_len1=} {y_len1=}')
-    print(f'{x_zero=} {y_zero=}')
-    print(f'{x_end=} {y_end=}')
+        x_len1, y_len1 = (x_len0, y_len0) + walked_len
+        x_zero, y_zero = -walked_min
+        x_end = ceil(x_zero + x_len0)
+        y_end = ceil(y_zero + y_len0)
+        x_zero = ceil(x_zero)
+        y_zero = ceil(y_zero)
+    x_len1 = ceil(x_len1)
+    y_len1 = ceil(y_len1)
     cube1 = np.empty((bands_num, y_len1, x_len1))
     if crop:
         for i in range(bands_num):
             if i == green_id:
-                intersection = cube0[i, y_zero:y_end, x_zero:x_end]
+                cube1[i] = cube0[i, y_zero:y_end, x_zero:x_end]
             else:
                 print(f'Band {i}')
                 x_shift, y_shift = walked[i]
                 print(f'{x_shift=} {y_shift=}')
                 array = float_shift(cube0[i], x_shift, y_shift)
-                intersection = array[y_zero:y_end, x_zero:x_end]
-            cube1[i] = intersection
+                cube1[i] = array[y_zero:y_end, x_zero:x_end]
     else:
         cube1.fill(np.nan)
         for i in range(bands_num):
