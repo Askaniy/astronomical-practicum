@@ -69,14 +69,6 @@ band_list = []
 for band in bands:
     band_list.append(band_reader(band))
 
-for i in range(len(bands)):
-    #save_histogram(photospectral_cube[i], f'{folder}/hist_{i}_{bands[i]}.png')
-    array = band_list[i]
-    #array = deconvolved(array, one_div_x_array(11)) # Убирает размытие
-    array = np.clip(array, 0, None) # Убирает отрицательные значения
-    array = array**0.25 # Усиленная гамма-коррекция
-    array2img(array).save(f'{folder}/-band_{i}_{bands[i]}.png')
-
 photospectral_cube = aligned_cube(band_list, crop=False)
 
 
@@ -85,7 +77,31 @@ photospectral_cube = aligned_cube(band_list, crop=False)
 for i in range(len(bands)):
     #save_histogram(photospectral_cube[i], f'{folder}/hist_{i}_{bands[i]}.png')
     array = photospectral_cube[i]
-    #array = deconvolved(array, one_div_x_array(11)) # Убирает размытие
     array = np.clip(array, 0, None) # Убирает отрицательные значения
     array = array**0.25 # Усиленная гамма-коррекция
     array2img(array).save(f'{folder}/band_{i}_{bands[i]}.png')
+
+
+# Удаление фильтра I
+photospectral_cube = np.nan_to_num(trimmed_nan(photospectral_cube[:-1], crop=True))
+
+# Нормирование по одному из пикселей
+photospectral_cube = (photospectral_cube.T / photospectral_cube[:, 32, 312]).T
+
+radiuses = (11, 11, 10)
+for i in range(3):
+    array = deconvolved(photospectral_cube[i], one_div_x_array(radiuses[i]))
+    if i == 2:
+        array *= 0.5
+    array = np.clip(array*0.5, 0, 1)**(1/2.2) * 255
+    Image.fromarray(array.astype('int8'), mode='L').save(f'{folder}/color_{i}.png')
+
+# Сохранение среднего результата, нормированного по одному из пикселей
+array = smart_mean(photospectral_cube, [1, 1, 1], crop=False)
+#array = deconvolved(array, one_div_x_array(11)) # Убирает размытие
+array = np.clip(array, 0, None) # Убирает отрицательные значения
+result = array**0.25 # Усиленная гамма-коррекция
+array2img(result).save(f'{folder}/result_1_4.png')
+
+
+# ФОТОМЕТРИЯ - анализ photospectral_cube относительно центра галактики
