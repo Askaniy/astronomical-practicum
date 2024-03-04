@@ -1,10 +1,11 @@
 from pathlib import Path
 from itertools import chain
-from math import ceil, floor
+from math import ceil
 from copy import deepcopy
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
+from ccdproc import cosmicray_lacosmic
 from photutils.background import Background2D
 from skimage import restoration
 from image_registration import chi2_shift
@@ -37,10 +38,26 @@ def crop(array):
     """ Инверсия вертикальной оси и обрезка чёрных краёв """
     return array[-22:0:-1,19:]
 
-def background_subtracted(array: np.ndarray):
+def cosmic_ray_subtracted(array: np.ndarray, sigma: int|float = 5):
+    """ Вычитает космические лучи """
+    return cosmicray_lacosmic(array, sigclip=sigma)[0]
+
+def background_subtracted(array: np.ndarray, size_px: int = 200):
     """ Вычитает фон неба """
-    bkg = Background2D(array, (200, 200))
+    bkg = Background2D(array, (size_px, size_px))
     return array - bkg.background
+
+def smart_mean(cube: np.ndarray, exposures: np.ndarray, crop: bool = False):
+    """ Взвешенное среднее с учётом альфа-канала """
+    if crop:
+        return np.average(cube, axis=0, weights=exposures)
+    else:
+        array = np.zeros((cube.shape[1], cube.shape[2]))
+        exposure_array = np.zeros_like(array)
+        for i, band in enumerate(cube):
+            array += np.nan_to_num(band)
+            exposure_array[~np.isnan(band)] += exposures[i]
+        return array / exposure_array
 
 def float_shift(array: np.ndarray, x_shift: float, y_shift: float):
     """ Cубпиксельный циклический сдвиг """

@@ -1,7 +1,6 @@
 from pathlib import Path
 from astropy.io import fits
 import numpy as np
-from ccdproc import cosmicray_lacosmic
 
 # Путь к данным до папки stud
 from config import data_folder
@@ -58,12 +57,12 @@ def band_reader(name: str):
             header = hdul[0].header
             exposures.append(header['EXPTIME'])
             data = (crop(hdul[0].data) - bias_array) / flat_field_array
-            data = cosmicray_lacosmic(data, sigclip=5)[0]
-            data = background_subtracted(data)
+            data = cosmic_ray_subtracted(data, sigma=5)
+            data = background_subtracted(data, size_px=200)
             band_list.append(data)
             #save_histogram(data, f'{folder}/{name}/{file.stem}.png')
     cube = aligned_cube(np.array(band_list), crop=False)
-    return np.average(cube, axis=0, weights=exposures)
+    return smart_mean(cube, exposures, crop=False)
 
 bands = ('B', 'V', 'R', 'I')
 band_list = []
@@ -78,7 +77,7 @@ for i in range(len(bands)):
     array = array**0.25 # Усиленная гамма-коррекция
     array2img(array).save(f'{folder}/-band_{i}_{bands[i]}.png')
 
-photospectral_cube = aligned_cube(band_list, crop=True)
+photospectral_cube = aligned_cube(band_list, crop=False)
 
 
 # Сохранение нормированных на максимальную яркость фотографий
