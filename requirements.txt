@@ -7,3 +7,4 @@ image_registration
 pytest
 photutils
 scikit-image
+ccdproc

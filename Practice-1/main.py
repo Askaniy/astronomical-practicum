@@ -1,6 +1,7 @@
 from pathlib import Path
 from astropy.io import fits
 import numpy as np
+from ccdproc import cosmicray_lacosmic
 
 # Путь к данным до папки stud
 from config import data_folder
@@ -56,7 +57,9 @@ def band_reader(name: str):
         with fits.open(file) as hdul:
             header = hdul[0].header
             exposures.append(header['EXPTIME'])
-            data = background_subtracted((crop(hdul[0].data) - bias_array) / flat_field_array)
+            data = (crop(hdul[0].data) - bias_array) / flat_field_array
+            data = cosmicray_lacosmic(data, sigclip=5)[0]
+            data = background_subtracted(data)
             band_list.append(data)
             #save_histogram(data, f'{folder}/{name}/{file.stem}.png')
     cube = aligned_cube(np.array(band_list), crop=False)
