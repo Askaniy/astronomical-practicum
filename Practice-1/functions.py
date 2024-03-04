@@ -44,12 +44,21 @@ def background_subtracted(array: np.ndarray):
 
 def float_shift(array: np.ndarray, x_shift: float, y_shift: float):
     """ Cубпиксельный циклический сдвиг """
+    array = np.nan_to_num(array)
     y_len, x_len = array.shape
     x_freq = x_shift * np.fft.fftfreq(x_len)[np.newaxis,:]
     y_freq = y_shift * np.fft.fftfreq(y_len)[:,np.newaxis]
     freq_grid = x_freq + y_freq
     kernel = np.exp(-1j*2*np.pi*freq_grid)
     return np.real(np.fft.ifftn(np.fft.fftn(array) * kernel))
+
+def trimmed_nan(cube: np.ndarray, crop: bool):
+    """ Обрезает np.nan с краёв по пространственным осям """
+    if crop:
+        nan_pixels = np.isnan(cube).any(axis=0)
+    else:
+        nan_pixels = np.isnan(cube).all(axis=0)
+    return cube[:,~nan_pixels.all(axis=1),:][:,:,~nan_pixels.all(axis=0)]
 
 def aligned_cube(cube0: list|np.ndarray, crop: bool = False):
     """ Выравнивание каналов спектрального куба """
@@ -66,7 +75,7 @@ def aligned_cube(cube0: list|np.ndarray, crop: bool = False):
             cube0[i, :shapes[i][0], :shapes[i][1]] = band
     else:
         bands_num, y_len0, x_len0 = cube0.shape
-    cube0 = np.nan_to_num(cube0)
+    cube0_isnan = np.isnan(cube0).astype('float')
     green_id = ceil(bands_num / 2) - 1 # единственное неискажённое изображение будет в середине
     shifts = [(0, 0)]
     for i in range(bands_num-1):
@@ -95,6 +104,8 @@ def aligned_cube(cube0: list|np.ndarray, crop: bool = False):
             else:
                 x_shift, y_shift = walked[i]
                 array = float_shift(cube0[i], x_shift, y_shift)
+                isnan = float_shift(cube0_isnan[i], x_shift, y_shift) > 0.5
+                array[isnan] = np.nan
                 cube1[i] = array[y_zero:y_end, x_zero:x_end]
     else:
         cube1.fill(np.nan)
@@ -104,6 +115,8 @@ def aligned_cube(cube0: list|np.ndarray, crop: bool = False):
             else:
                 x_shift, y_shift = walked[i]
                 array = float_shift(cube0[i], x_shift, y_shift)
+                isnan = float_shift(cube0_isnan[i], x_shift, y_shift) > 0.5
+                array[isnan] = np.nan
                 x_ceil, y_ceil = np.ceil(np.abs(walked[i])).astype('int')
                 x_floor, y_floor = np.floor(np.abs(walked[i])).astype('int')
                 if 0 not in (x_floor, y_floor):
@@ -143,7 +156,7 @@ def aligned_cube(cube0: list|np.ndarray, crop: bool = False):
                         array[-y_ceil:, :] = np.nan # cut
                         cube1[i, y_zero-y_floor:y_zero, x_zero:x_end] = edge # paste
                 cube1[i, y_zero:y_end, x_zero:x_end] = array
-    return cube1
+    return trimmed_nan(cube1, crop)
 
 def shifted(reference: np.ndarray, target: np.ndarray):
     """ Определяет сдвиг и выравнивает два изображения """
