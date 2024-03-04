@@ -10,6 +10,9 @@ folder = Path(data_folder).expanduser()
 from functions import *
 
 
+# NGC 304, NGC 7465, NGC 7625 - True
+edge = True
+
 # Чтение смещений
 
 bias_list = []
@@ -20,7 +23,7 @@ for file in fits_list(folder):
         #print(repr(hdul[0]))
         header = hdul[0].header
         if header['IMAGETYP'] == 'bias':
-            data = crop(hdul[0].data)
+            data = crop(hdul[0].data, edge)
             bias_list.append(data)
             #save_histogram(data, f'{folder}/{file.stem}.png')
 
@@ -37,7 +40,7 @@ for file in fits_list(folder):
     with fits.open(file) as hdul:
         header = hdul[0].header
         if header['IMAGETYP'] != 'bias':
-            data = crop(hdul[0].data) - bias_array
+            data = crop(hdul[0].data, edge) - bias_array
             flat_field_list.append(data / np.median(data))
             #save_histogram(data, f'{folder}/{file.stem}.png')
 
@@ -56,7 +59,7 @@ def band_reader(name: str):
         with fits.open(file) as hdul:
             header = hdul[0].header
             exposures.append(header['EXPTIME'])
-            data = (crop(hdul[0].data) - bias_array) / flat_field_array
+            data = (crop(hdul[0].data, edge) - bias_array) / flat_field_array
             data = cosmic_ray_subtracted(data, sigma=5)
             data = background_subtracted(data, size_px=200)
             band_list.append(data)
@@ -65,6 +68,7 @@ def band_reader(name: str):
     return smart_mean(cube, exposures, crop=False)
 
 bands = ('B', 'V', 'R', 'I')
+#bands = ('B', 'V', 'R') # PGC 60020 и UGC 1198
 band_list = []
 for band in bands:
     band_list.append(band_reader(band))
@@ -83,16 +87,36 @@ for i in range(len(bands)):
 
 
 # Удаление фильтра I
-photospectral_cube = np.nan_to_num(trimmed_nan(photospectral_cube[:-1], crop=True))
+photospectral_cube = np.nan_to_num(trimmed_nan(photospectral_cube[0:3], crop=True))
 
-# Нормирование по одному из пикселей
-photospectral_cube = (photospectral_cube.T / photospectral_cube[:, 32, 312]).T
+photospectral_cube[0] *= 0.064
+photospectral_cube[1] *= 0.040
+photospectral_cube[2] *= 0.012
 
-radiuses = (11, 11, 10)
+
+# Размеры ядер свёртки для разных галактик
+
+# NGC 304
+#kernel_sizes = (9, 9, 8)
+
+# NGC 7465
+kernel_sizes = (11, 11, 9)
+
+# NGC 7625
+#kernel_sizes = (9, 8, 9)
+#photospectral_cube[1] *= 0.8
+#photospectral_cube[2] *= 1.5
+
+# PGC 60020
+#kernel_sizes = (17, 13, 13)
+#photospectral_cube[0] *= 1.6
+
+# UGC 1198
+#kernel_sizes = (9, 9, 8)
+
+
 for i in range(3):
-    array = deconvolved(photospectral_cube[i], one_div_x_array(radiuses[i]))
-    if i == 2:
-        array *= 0.5
+    array = deconvolved(photospectral_cube[i], one_div_x_array(kernel_sizes[i]))
     array = np.clip(array*0.5, 0, 1)**(1/2.2) * 255
     Image.fromarray(array.astype('int8'), mode='L').save(f'{folder}/color_{i}.png')
 

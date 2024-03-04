@@ -12,7 +12,7 @@ from image_registration import chi2_shift
 
 def fits_list(path: Path):
     """ Создаёт итератор по всем найденным в папке файлам FITS """
-    return chain.from_iterable(path.glob(f'*.{ext}') for ext in ('fts', 'fit', 'fits'))
+    return chain.from_iterable(path.glob(f'*.{ext}') for ext in ('fts', 'fit', 'fits', 'FTS', 'FIT', 'FITS'))
 
 def save_histogram(array: np.ndarray, path: str):
     """ Сохраняет гистограмму """
@@ -34,9 +34,14 @@ def array2img(array: np.ndarray):
     array *= 255
     return Image.fromarray(array.astype('uint8'), mode='LA')
 
-def crop(array):
+def crop(array: np.ndarray, edge: bool):
     """ Инверсия вертикальной оси и обрезка чёрных краёв """
-    return array[-22:0:-1,19:]
+    if array.ndim == 3:
+        array = array[0]
+    if edge:
+        return array[-22:0:-1,19:]
+    else:
+        return array[::-1,:]
 
 def cosmic_ray_subtracted(array: np.ndarray, sigma: int|float = 5):
     """ Вычитает космические лучи """
