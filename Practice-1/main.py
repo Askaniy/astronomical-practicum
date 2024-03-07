@@ -2,6 +2,7 @@ from pathlib import Path
 from astropy.io import fits
 import numpy as np
 
+from scipy.spatial.transform import Rotation
 # Путь к данным до папки stud
 from config import data_folder
 folder = Path(data_folder).expanduser()
@@ -129,3 +130,78 @@ array2img(result).save(f'{folder}/result_1_4.png')
 
 
 # ФОТОМЕТРИЯ - анализ photospectral_cube относительно центра галактики
+
+
+angle_small = 26.48
+
+from scipy import ndimage, datasets
+
+import matplotlib.pyplot as plt
+
+
+array_rot = np.array(ndimage.rotate(result, 18.4, reshape=False))
+array2img(array_rot).save(f'{folder}/array_rot.png')
+
+center_coord = np.array([520, 462])
+
+coord_big = np.array([373+16, 694-8])
+#slice_big = array_rot[coord_big[0]:coord_big[1] , center_coord[1]]
+slice_big = array_rot[center_coord[1], coord_big[0]:coord_big[1]]
+
+coord_small = np.array([330, 626])
+#slice_small = array_rot[center_coord[0], coord_small[0]:coord_small[1]]
+slice_small = array_rot[ coord_small[0]:coord_small[1], center_coord[0]]
+
+
+import plotly.graph_objects as go
+#строим графики срезов
+#fig = go.Figure()
+#fig.add_trace(go.Scatter(x=np.arange(slice_big.size), y=slice_big,
+#                    mode='lines',
+#                    name='lines'))
+#fig.add_trace(go.Scatter(x=np.arange(slice_small.size), y=slice_small,
+#                    mode='lines',
+#                    name='lines'))
+#fig.show()
+
+
+#Выполнить интегральную фотометрию галактики
+
+center_BVRI = np.array([[540, 525],
+                       [530, 511],
+                       [531, 494],
+                       [531, 478]])
+
+def circular_mask(shape, center, radius):
+    x, y = np.ogrid[:shape[0], :shape[1]]
+    mask = (x - center[0])*2 + (y - center[1])*2 <= radius**2
+    return mask
+
+integral_sum = np.array([[0.0 for _ in range(89)] for _ in range(3)])
+
+radius = np.arange(3, 270, 3)
+
+
+for i in range(3):
+    integral = np.array([])
+    for rad in radius:
+        mask = circular_mask(photospectral_cube[i].shape, center_BVRI[i], rad)
+        result_circ = photospectral_cube[i][mask]
+        integral = np.append(integral, sum(result_circ))
+    #print(integral)
+    integral_sum[i]= integral
+
+#print(integral_sum)
+
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=radius, y=integral_sum[0],
+                    mode='lines',
+                    name='B'))
+fig.add_trace(go.Scatter(x=radius, y=integral_sum[1],
+                    mode='lines',
+                    name='V'))
+fig.add_trace(go.Scatter(x=radius, y=integral_sum[2],
+                    mode='lines',
+                    name='R'))
+fig.show()
