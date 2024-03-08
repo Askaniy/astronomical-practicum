@@ -30,7 +30,7 @@ for file in fits_list(folder):
 
 bias_array = np.median(np.array(bias_list), axis=0)
 #save_histogram(bias_array, f'{folder}/bias_histogram.png')
-array2img(bias_array).save(folder/'bias.png')
+#array2img(bias_array).save(folder/'bias.png')
 
 
 # Чтение плоских полей
@@ -48,7 +48,7 @@ for file in fits_list(folder):
 flat_field_array = np.median(np.array(flat_field_list), axis=0)
 flat_field_array = np.clip(flat_field_array, 0.01, None)
 #save_histogram(flat_field_array, f'{folder}/flat_field_histogram.png')
-array2img(flat_field_array).save(folder/'flat_field.png')
+#array2img(flat_field_array).save(folder/'flat_field.png')
 
 
 # Чтение фотографий и запись в куб
@@ -84,7 +84,7 @@ for i in range(len(bands)):
     array = photospectral_cube[i]
     array = np.clip(array, 0, None) # Убирает отрицательные значения
     array = array**0.25 # Усиленная гамма-коррекция
-    array2img(array).save(f'{folder}/band_{i}_{bands[i]}.png')
+    #array2img(array).save(f'{folder}/band_{i}_{bands[i]}.png')
 
 
 # Удаление фильтра I
@@ -126,58 +126,51 @@ array = smart_mean(photospectral_cube, [1, 1, 1], crop=False)
 #array = deconvolved(array, one_div_x_array(11)) # Убирает размытие
 array = np.clip(array, 0, None) # Убирает отрицательные значения
 result = array**0.25 # Усиленная гамма-коррекция
-array2img(result).save(f'{folder}/result_1_4.png')
+#array2img(result).save(f'{folder}/result_1_4.png')
 
 
 # ФОТОМЕТРИЯ - анализ photospectral_cube относительно центра галактики
 
-
 angle_small = 26.48
 
-from scipy import ndimage, datasets
-
-import matplotlib.pyplot as plt
-
+from scipy import ndimage
 
 array_rot = np.array(ndimage.rotate(result, 18.4, reshape=False))
-array2img(array_rot).save(f'{folder}/array_rot.png')
+#array2img(array_rot).save(f'{folder}/array_rot.png')
 
-center_coord = np.array([520, 462])
+center_coord = (520, 462)
 
-coord_big = np.array([373+16, 694-8])
+coord_big = (373+16, 694-8) # большая ось
 #slice_big = array_rot[coord_big[0]:coord_big[1] , center_coord[1]]
 slice_big = array_rot[center_coord[1], coord_big[0]:coord_big[1]]
 
-coord_small = np.array([330, 626])
+coord_small = (330, 626) # малая ось
 #slice_small = array_rot[center_coord[0], coord_small[0]:coord_small[1]]
-slice_small = array_rot[ coord_small[0]:coord_small[1], center_coord[0]]
+slice_small = array_rot[coord_small[0]:coord_small[1], center_coord[0]]
 
 
 import plotly.graph_objects as go
-#строим графики срезов
-#fig = go.Figure()
-#fig.add_trace(go.Scatter(x=np.arange(slice_big.size), y=slice_big,
-#                    mode='lines',
-#                    name='lines'))
-#fig.add_trace(go.Scatter(x=np.arange(slice_small.size), y=slice_small,
-#                    mode='lines',
-#                    name='lines'))
+# Строим графики срезов
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=(np.arange(slice_big.size)-131)* 0.357, y=slice_big,
+                    mode='lines'))
+fig.add_trace(go.Scatter(x=(np.arange(slice_small.size)-131)* 0.357, y=slice_small,
+                    mode='lines'))
 #fig.show()
 
 
-#Выполнить интегральную фотометрию галактики
+# Выполнить интегральную фотометрию галактики
 
-center_BVRI = np.array([[540, 525],
-                       [530, 511],
-                       [531, 494],
-                       [531, 478]])
+center_BVRI = (461, 531)
 
 def circular_mask(shape, center, radius):
-    x, y = np.ogrid[:shape[0], :shape[1]]
-    mask = (x - center[0])*2 + (y - center[1])*2 <= radius**2
+    y, x = np.ogrid[:shape[0], :shape[1]]
+    mask = (x - center[1])**2 + (y - center[0])**2 <= radius**2
     return mask
 
-integral_sum = np.array([[0.0 for _ in range(89)] for _ in range(3)])
+#array2img(circular_mask(photospectral_cube[i].shape, center_BVRI, 20)).save(f'{folder}/circle.png')
+
+integral_sum = np.zeros((3, 89))
 
 radius = np.arange(3, 270, 3)
 
@@ -185,23 +178,43 @@ radius = np.arange(3, 270, 3)
 for i in range(3):
     integral = np.array([])
     for rad in radius:
-        mask = circular_mask(photospectral_cube[i].shape, center_BVRI[i], rad)
+        mask = circular_mask(photospectral_cube[i].shape, center_BVRI, rad)
         result_circ = photospectral_cube[i][mask]
         integral = np.append(integral, sum(result_circ))
     #print(integral)
     integral_sum[i]= integral
 
-#print(integral_sum)
+# print(integral_sum)
+
+radius = radius.astype('float') * 0.357
+
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(1, 1, figsize=(12, 8), dpi=100)
+ax.plot(radius, integral_sum[0], color='blue', label='B')
+ax.plot(radius, integral_sum[1], color='green', label='V')
+ax.plot(radius, integral_sum[2], color='red', label='R')
+ax.set_xlabel('Расстояние от центра NGC 7465, "')
+ax.set_ylabel('Яркость')
+ax.legend()
+fig.tight_layout()
+plt.savefig(f'{folder}/integ.png')
 
 
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=radius, y=integral_sum[0],
-                    mode='lines',
-                    name='B'))
-fig.add_trace(go.Scatter(x=radius, y=integral_sum[1],
-                    mode='lines',
-                    name='V'))
-fig.add_trace(go.Scatter(x=radius, y=integral_sum[2],
-                    mode='lines',
-                    name='R'))
-fig.show()
+fig.add_trace(go.Scatter(x=radius, y=integral_sum[0], mode='lines', name='B'))
+fig.add_trace(go.Scatter(x=radius, y=integral_sum[2], mode='lines', name='R'))
+fig.add_trace(go.Scatter(x=radius, y=integral_sum[1], mode='lines', name='V'))
+#fig.show()
+
+#array = np.where(((0.5 < array) and (array < 0.51)), 1, array)
+#array = np.clip(array, 0, None) # Убирает отрицательные значения
+#result = array**0.25 # Усиленная гамма-коррекция
+#array2img(result).save(f'{folder}/result_iso.png')
+
+
+fig, ax = plt.subplots(1, 1, figsize=(12, 8), dpi=100)
+ax.clabel(ax.contour(array[::-1,:], [0.01, 0.05, 0.1, 0.5, 1.]), inline=True, fontsize=10)
+fig.tight_layout()
+plt.savefig(f'{folder}/iso.png')
