@@ -22,15 +22,16 @@ def array2img(array: np.ndarray):
     array *= 255
     return Image.fromarray(array.astype('uint8'), mode='LA')
 
-def coord_shifts(array: np.ndarray, coord: np.ndarray):
+def coord_shifts(array: np.ndarray, coord: tuple):
     """ Функция поиска координат звезды на разных снимках """
-    radius_star = 20 
-    reference = array[0] # относительно этого опорного изображения будем считать сдвиги и повороты
+    radius_star = 20 # px
+    reference = array[0] # опорное изображение
     new_coords = [coord]
-    for j in range(1, len(array)):
-       target = array[j]
-       transf, (reference_list, target_list) = aa.find_transform(reference, target) # Значения координат вшиты в параметры скобках
-       for (x1, y1), (x2, y2) in zip(reference_list, target_list):      # Значения угла transf.rotation в радианах
-            if (x1 - coord[0])**2 + (y1 - coord[1])**2 <= radius_star:  # Значение сдвига по x,y transf.translation, есть еще transf.scale, типа масштаб, но я не понял как он работает
+    for target in array[1:]:
+        transf, (reference_list, target_list) = aa.find_transform(reference, target) # Значения координат вшиты в параметры скобках
+        # Доступны transf.rotation, transf.translation, transf.scale
+        for (x1, y1), (x2, y2) in zip(reference_list, target_list):
+            if (x1 - coord[0])**2 + (y1 - coord[1])**2 <= radius_star:
                 new_coords.append([x2, y2])
+                break
     return np.array(new_coords)

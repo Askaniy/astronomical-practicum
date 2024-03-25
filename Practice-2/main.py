@@ -6,12 +6,12 @@ import numpy as np
 from config import data_folder
 folder = Path(data_folder).expanduser()
 
-import functions as func
+import auxiliary as aux
 
 
 def band_reader(name: str):
     band_list = []
-    for file in func.fits_list(folder/name):
+    for file in aux.fits_list(folder/name):
         with fits.open(file) as hdul:
             band_list.append(hdul[0].data[::-1,:])
     return band_list
@@ -22,20 +22,23 @@ band_list = []
 for band in bands:
     band_list.append(band_reader(band))
 
+# Координаты звёзд для каждого фильтра на референсных изображениях (X, Y)
+varstar1 = ((103, 126), (97, 126), (123, 127), (99, 124))
+varstar2 = ((84, 179), (77, 179), (103, 180), (80, 177))
+refstar1 = ((83, 150), (76, 150), (103, 151), (80, 149))
+refstar2 = ((185, 143), (178, 143), (204, 143), (181, 141))
+
 # Превью референсных изображений
 for i, band in enumerate(bands):
-    ref = np.clip(band_list[i][0], 0, None) # Убирает отрицательные значения
+    ref = np.clip(band_list[i][0], 0, None).astype('float') # Убирает отрицательные значения
+    ref[tuple(reversed(varstar1[i]))] = np.nan # Закрашивание исследуемых звёзд альфа-каналом для проверки координат
+    ref[tuple(reversed(varstar2[i]))] = np.nan
+    ref[tuple(reversed(refstar1[i]))] = np.nan
+    ref[tuple(reversed(refstar2[i]))] = np.nan
     ref = ref**0.25 # Усиленная гамма-коррекция
-    func.array2img(ref).save(f'{folder}/band_{i}_{band}.png')
+    aux.array2img(ref).save(f'{folder}/band_{i}_{band}.png')
 
-# Вычисление координат
-star_centers = ((84, 105), (81, 106), (81, 82), (78, 105)) # Центры переменной звезды в разных фильтрах в первых fits-ах
-new_coords_Br = func.coord_shifts(band_list[0], star_centers[0])
-new_coords_h = func.coord_shifts(band_list[1], star_centers[1])
-new_coords_j = func.coord_shifts(band_list[2], star_centers[2])
-#new_coords_k = coord_shifts(band_list[3], star_centers[3]) # не используется, так как у нас не сработал для него astroalign
-
-print(new_coords_Br)
-print(new_coords_h)
-print(new_coords_j)
-#print(new_coords_k)
+# Вычисление координат для каждого снимка
+for i, band in enumerate(bands):
+    new_coords = aux.coord_shifts(band_list[i], varstar1[i])
+    print(f'Для фильтра {band} звезда найдена на {new_coords.shape[0]} снимках из {len(band_list[i])}')
