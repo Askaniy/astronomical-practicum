@@ -1,7 +1,0 @@
-numpy
-astropy
-matplotlib
-Pillow
-sigfig
-photutils
-astroalign
