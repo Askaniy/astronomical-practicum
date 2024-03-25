@@ -2,7 +2,6 @@ from pathlib import Path
 from astropy.io import fits
 import numpy as np
 
-from scipy.spatial.transform import Rotation
 # Путь к данным до папки stud
 from config import data_folder
 folder = Path(data_folder).expanduser()
