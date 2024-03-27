@@ -23,10 +23,10 @@ for band in bands:
     band_list.append(band_reader(band))
 
 # Координаты звёзд для каждого фильтра на референсных изображениях (X, Y)
-varstar1 = ((103, 126), (97, 126), (123, 127), (99, 124))
-varstar2 = ((84, 179), (77, 179), (103, 180), (80, 177))
-refstar1 = ((83, 150), (76, 150), (103, 151), (80, 149))
-refstar2 = ((185, 143), (178, 143), (204, 143), (181, 141))
+varstar1 = ((100, 124), (117, 124), (116, 125), (117, 124))
+varstar2 = ((80, 178), (97, 178), (96, 179), (98, 178))
+refstar1 = ((80, 149), (97, 149), (96, 150), (97, 149))
+refstar2 = ((181, 141), (198, 141), (197, 142), (198, 141))
 
 # Превью референсных изображений
 for i, band in enumerate(bands):
@@ -49,10 +49,11 @@ from photutils.psf import IntegratedGaussianPRF, PSFPhotometry, make_psf_model
 psf_model1 = IntegratedGaussianPRF(flux=1, sigma=2.7/2.35)
 
 # Кастомная модель в оболочке astropy
-psf_model4 = make_psf_model(aux.custom_psf())
+psf_model4 = make_psf_model(aux.custom_psf1())
+psf_model5 = make_psf_model(aux.custom_psf2())
 
 # Вписывание в координаты
-psfphot = PSFPhotometry(psf_model4, fit_shape=(15, 15), aperture_radius=7)
+psfphot = PSFPhotometry(psf_model5, fit_shape=(15, 15), aperture_radius=7)
 phot = psfphot(data, init_params=aux.coords2table(varstar2[0]))
 print(phot)
 

@@ -2,10 +2,11 @@ from pathlib import Path
 from itertools import chain
 from PIL import Image
 import numpy as np
+import re
 
 def fits_list(path: Path):
-    """ Создаёт итератор по всем найденным в папке файлам FITS """
-    return chain.from_iterable(path.glob(f'*.{ext}') for ext in ('fts', 'fit', 'fits', 'FTS', 'FIT', 'FITS'))
+    """ Создаёт итератор по всем найденным в папке файлам FITS в порядке возрастания числа в названии """
+    return sorted(chain.from_iterable(path.glob(f'*.{ext}') for ext in ('fts', 'fit', 'fits', 'FTS', 'FIT', 'FITS')), key=lambda x: int(re.search(r'\d+', x.name).group()))
 
 def print_min_mean_max(array: np.ndarray):
     """ Печатает характеристики распределения значений в массиве """
@@ -26,7 +27,7 @@ def array2img(array: np.ndarray):
 
 
 # Выравнивание
-
+'''
 import astroalign as aa
 
 def coord_shifts(array: np.ndarray, coord: tuple):
@@ -42,7 +43,7 @@ def coord_shifts(array: np.ndarray, coord: tuple):
                 new_coords.append([x2, y2])
                 break
     return np.array(new_coords)
-
+'''
 
 # Функции PSF фотометрии
 
@@ -56,7 +57,7 @@ def coords2table(coords: tuple):
     return table
 
 @custom_model
-def custom_psf(x, y, amplitude=1., x_0=0., y_0=0., a=0.5, b=0.15, k=0.4, p=12):
+def custom_psf1(x, y, amplitude=1., x_0=0., y_0=0., a=0.5, b=0.15, k=0.4, p=12):
     """
     Эмпирическое ядро свёртки
     a — узость гауссианы
@@ -73,3 +74,14 @@ def custom_psf(x, y, amplitude=1., x_0=0., y_0=0., a=0.5, b=0.15, k=0.4, p=12):
     r2 = (x-x_0)**2 + (y-y_0)**2
     norm = k*np.exp(-np.abs(a)*r2) + (1-k)*(1 - np.clip(b*np.sqrt(r2), 0., 1.))**p
     return amplitude * norm
+
+@custom_model
+def custom_psf2(x, y, amplitude=1., x_0=0., y_0=0., a=0.7, b=1.1):
+    """
+    Эмпирическое ядро свёртки
+    a — ширина колокола
+    b — степень колокообразности
+    """
+    # Вычисление
+    r = np.sqrt((x-x_0)**2 + (y-y_0)**2)
+    return amplitude * np.exp(-(r/a)**b)
